@@ -16,7 +16,7 @@ CORS(app)
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "1234567890",  
+    "password": "Fernanda0202",  
     "database": "monitoreo_seguridad"
 }
 
@@ -106,101 +106,128 @@ def obtener_incidentes():
     fecha = request.args.get("fecha")
     periodo = request.args.get("periodo", "day")
 
-    if not delegacion_id or not fecha:
-        return jsonify({"error": "Faltan parámetros 'delegacion_id' y 'fecha'"}), 400
+    # Validación mejorada de parámetros
+    if not delegacion_id:
+        return jsonify({"error": "Falta el parámetro 'delegacion_id'"}), 400
 
-    # Verificar si la fecha es futura
-    fecha_consulta = datetime.strptime(fecha, "%Y-%m-%d")
-    fecha_actual = datetime.now()
-    
-    # Si la fecha es futura, generar predicciones
-    if fecha_consulta > fecha_actual:
-        return generar_prediccion_incidentes(delegacion_id, fecha, periodo)
-    
-    # Si no es futura, obtener los datos históricos
+    # Manejo de fecha para predicciones mensuales
+    if periodo == "month":
+        if not fecha or fecha.strip() == "":
+            # Si no se proporciona fecha, usar el mes actual
+            fecha = datetime.now().strftime("%Y-%m")
+        
+        try:
+            # Validar formato de fecha para mes
+            year, month = map(int, fecha.split('-'))
+            fecha_consulta = datetime(year, month, 1)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Formato de fecha inválido para periodo 'month'. Usa 'YYYY-MM'"}), 400
+
+        # Generar predicción si la fecha es futura
+        if fecha_consulta > datetime.now():
+            return generar_prediccion_incidentes(delegacion_id, fecha, periodo)
+
+    elif periodo in ["day", "week"]:
+        # Validación de fecha para día y semana
+        if not fecha or fecha.strip() == "":
+            fecha = datetime.now().strftime("%Y-%m-%d")
+        
+        try:
+            fecha_consulta = datetime.strptime(fecha, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Formato de fecha inválido. Usa 'YYYY-MM-DD'"}), 400
+
+        # Generar predicción si la fecha es futura
+        if fecha_consulta > datetime.now():
+            return generar_prediccion_incidentes(delegacion_id, fecha, periodo)
+
+    # Conexión a la base de datos
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
 
     cursor = conn.cursor(dictionary=True)
-    
-    if periodo == "month":
-        # Extraer año y mes del parámetro fecha (formato YYYY-MM)
-        year, month = fecha.split('-')
-        
-        # Consulta SQL directa para mes
-        query = """
-            SELECT 
-                i.id,
-                i.tipo,
-                i.ubicacion,
-                TIME_FORMAT(i.hora_incidente, '%H:%i') AS hora,
-                r.nombre AS riesgo,
-                r.codigo_color,
-                i.fecha_incidente AS fecha
-            FROM 
-                incidentes i
-            JOIN 
-                niveles_riesgo r ON i.nivel_riesgo_id = r.id
-            WHERE 
-                i.delegacion_id = %s
-                AND YEAR(i.fecha_incidente) = %s
-                AND MONTH(i.fecha_incidente) = %s
-            ORDER BY 
-                i.fecha_incidente, i.hora_incidente
-        """
-        cursor.execute(query, (delegacion_id, year, month))
-    elif periodo == "week":
-        # Consulta para semana
-        query = """
-            SELECT 
-                i.id,
-                i.tipo,
-                i.ubicacion,
-                TIME_FORMAT(i.hora_incidente, '%H:%i') AS hora,
-                r.nombre AS riesgo,
-                r.codigo_color,
-                i.fecha_incidente AS fecha
-            FROM 
-                incidentes i
-            JOIN 
-                niveles_riesgo r ON i.nivel_riesgo_id = r.id
-            WHERE 
-                i.delegacion_id = %s
-                AND i.fecha_incidente >= %s
-                AND i.fecha_incidente <= DATE_ADD(%s, INTERVAL 6 DAY)
-            ORDER BY 
-                i.fecha_incidente, i.hora_incidente
-        """
-        cursor.execute(query, (delegacion_id, fecha, fecha))
-    else:
-        # Para día, actualizar el procedimiento o usar consulta directa
-        query = """
-            SELECT 
-                i.id,
-                i.tipo,
-                i.ubicacion,
-                TIME_FORMAT(i.hora_incidente, '%H:%i') AS hora,
-                r.nombre AS riesgo,
-                r.codigo_color,
-                i.fecha_incidente AS fecha
-            FROM 
-                incidentes i
-            JOIN 
-                niveles_riesgo r ON i.nivel_riesgo_id = r.id
-            WHERE 
-                i.delegacion_id = %s
-                AND i.fecha_incidente = %s
-            ORDER BY 
-                i.hora_incidente
-        """
-        cursor.execute(query, (delegacion_id, fecha))
-    
-    incidentes = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
-    
+    try:
+        # Consultas SQL por periodo (similar a tu código original)
+        if periodo == "month":
+            query = """
+                SELECT 
+                    i.id,
+                    i.tipo,
+                    i.ubicacion,
+                    TIME_FORMAT(i.hora_incidente, '%H:%i') AS hora,
+                    r.nombre AS riesgo,
+                    r.codigo_color,
+                    i.fecha_incidente AS fecha
+                FROM 
+                    incidentes i
+                JOIN 
+                    niveles_riesgo r ON i.nivel_riesgo_id = r.id
+                WHERE 
+                    i.delegacion_id = %s
+                    AND YEAR(i.fecha_incidente) = %s
+                    AND MONTH(i.fecha_incidente) = %s
+                ORDER BY 
+                    i.fecha_incidente, i.hora_incidente
+            """
+            cursor.execute(query, (delegacion_id, year, month))
+
+        elif periodo == "week":
+            query = """
+                SELECT 
+                    i.id,
+                    i.tipo,
+                    i.ubicacion,
+                    TIME_FORMAT(i.hora_incidente, '%H:%i') AS hora,
+                    r.nombre AS riesgo,
+                    r.codigo_color,
+                    i.fecha_incidente AS fecha
+                FROM 
+                    incidentes i
+                JOIN 
+                    niveles_riesgo r ON i.nivel_riesgo_id = r.id
+                WHERE 
+                    i.delegacion_id = %s
+                    AND i.fecha_incidente >= %s
+                    AND i.fecha_incidente <= DATE_ADD(%s, INTERVAL 6 DAY)
+                ORDER BY 
+                    i.fecha_incidente, i.hora_incidente
+            """
+            cursor.execute(query, (delegacion_id, fecha, fecha))
+
+        elif periodo == "day":
+            query = """
+                SELECT 
+                    i.id,
+                    i.tipo,
+                    i.ubicacion,
+                    TIME_FORMAT(i.hora_incidente, '%H:%i') AS hora,
+                    r.nombre AS riesgo,
+                    r.codigo_color,
+                    i.fecha_incidente AS fecha
+                FROM 
+                    incidentes i
+                JOIN 
+                    niveles_riesgo r ON i.nivel_riesgo_id = r.id
+                WHERE 
+                    i.delegacion_id = %s
+                    AND i.fecha_incidente = %s
+                ORDER BY 
+                    i.hora_incidente
+            """
+            cursor.execute(query, (delegacion_id, fecha))
+        else:
+            return jsonify({"error": "Periodo inválido. Usa 'day', 'week' o 'month'"}), 400
+
+        incidentes = cursor.fetchall()
+
+    except Exception as e:
+        return jsonify({"error": f"Error en la consulta: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
     return jsonify(incidentes)
 
 # Función para entrenar o actualizar el modelo de predicción

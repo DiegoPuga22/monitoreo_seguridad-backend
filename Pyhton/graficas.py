@@ -9,7 +9,7 @@ CORS(app)
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "1234567890",  
+    "password": "Fernanda0202",  
     "database": "monitoreo_seguridad"
 }
 
