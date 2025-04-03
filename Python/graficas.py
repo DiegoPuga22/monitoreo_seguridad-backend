@@ -1,31 +1,27 @@
 from flask import Flask, request, jsonify
-import mysql.connector
 from flask_cors import CORS
+from conexion import get_db_connection  # Importamos la función desde conexion.py
 
 app = Flask(__name__)
-CORS(app)
 
-# Configuración de la base de datos
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "Acordoen2004.",  
-    "database": "monitoreo_seguridad"
-}
-
-# Función para conectar con la base de datos
-def get_db_connection():
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        return conn
-    except mysql.connector.Error as err:
-        print(f"❌ Error de conexión a la base de datos: {err}")
-        return None
+# Configurar CORS para permitir solicitudes desde las URLs de tu frontend en Vercel
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "https://prvzu.vercel.app",
+            "https://prvzu-git-master-diego-ivans-projects-6ce116bc.vercel.app",
+            "https://prvzu-tcagwng99-diego-ivans-projects-6ce116bc.vercel.app"
+        ]
+    }
+})
 
 # Ruta para obtener las zonas de riesgo
 @app.route('/api/zonas_riesgo', methods=['GET'])
 def get_zonas_riesgo():
     conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+
     cursor = conn.cursor(dictionary=True)  # Return results as dictionaries
     
     # Consulta para calcular los porcentajes de riesgo
@@ -57,6 +53,9 @@ def get_estimaciones_riesgo():
     dias = request.args.get('dias', default=7, type=int)
     
     conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+    
     cursor = conn.cursor(dictionary=True)
     
     # Llamada al procedimiento almacenado para obtener las predicciones
@@ -72,7 +71,11 @@ def get_estimaciones_riesgo():
     return jsonify(estimaciones_riesgo)
 
 # Ruta de prueba para ver si la API corre
-
+@app.route("/")
+def home():
+    return "🔥 El servidor Flask para gráficas está corriendo correctamente."
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    # Render asigna un puerto dinámico a través de la variable de entorno PORT
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)  # debug=False para producción

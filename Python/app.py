@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import mysql.connector
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import random
@@ -8,35 +7,32 @@ import os
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
+from conexion import get_db_connection  # Importamos la función desde conexion.py
 
 app = Flask(__name__)
-CORS(app)
 
-# Configuración de la base de datos
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "Acordeon2004.",  
-    "database": "monitoreo_seguridad"
-}
+# Configurar CORS para permitir solicitudes desde las URLs de tu frontend en Vercel
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "https://prvzu.vercel.app",
+            "https://prvzu-git-master-diego-ivans-projects-6ce116bc.vercel.app",
+            "https://prvzu-tcagwng99-diego-ivans-projects-6ce116bc.vercel.app"
+        ]
+    }
+})
 
 # Ruta para modelos de aprendizaje
-MODELS_DIR = "models/"
+# Usar el disco persistente en Render, o una carpeta local para pruebas
+MODELS_DIR = "/app/models" if os.getenv("RENDER") else "models/"
 os.makedirs(MODELS_DIR, exist_ok=True)
-
-# Función para conectar con la base de datos
-def get_db_connection():
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        return conn
-    except mysql.connector.Error as err:
-        print(f"❌ Error de conexión a la base de datos: {err}")
-        return None
-    
 
 @app.route('/api/zonas_riesgo', methods=['GET'])
 def get_zonas_riesgo():
     conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+
     cursor = conn.cursor(dictionary=True)  # Return results as dictionaries
     
     # Consulta para calcular los porcentajes de riesgo
@@ -68,6 +64,9 @@ def get_estimaciones_riesgo():
     dias = request.args.get('dias', default=7, type=int)
     
     conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+    
     cursor = conn.cursor(dictionary=True)
     
     # Llamada al procedimiento almacenado para obtener las predicciones
@@ -81,8 +80,6 @@ def get_estimaciones_riesgo():
     conn.close()
     
     return jsonify(estimaciones_riesgo)
-
-
 
 # Obtener lista de delegaciones
 @app.route("/delegaciones", methods=["GET"])
@@ -149,7 +146,7 @@ def obtener_incidentes():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # Consultas SQL por periodo (similar a tu código original)
+        # Consultas SQL por periodo
         if periodo == "month":
             query = """
                 SELECT 
@@ -697,10 +694,9 @@ def migrar_predicciones():
         conn.close()
         return jsonify({"error": f"Error al migrar predicciones: {str(e)}"}), 500
 
-# Rutas adicionales (mantener las existentes)
+# Rutas adicionales
 @app.route("/estadisticas_historicas", methods=["GET"])
 def obtener_estadisticas_historicas():
-    # Código original sin cambios
     delegacion_id = request.args.get("delegacion_id")
     dias = request.args.get("dias", 30)
 
@@ -725,4 +721,6 @@ def home():
     return "🔥 El servidor Flask está corriendo correctamente con predicciones de incidentes futuros y aprendizaje automático."
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # Render asigna un puerto dinámico a través de la variable de entorno PORT
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)  # debug=False para producción
