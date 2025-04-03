@@ -23,8 +23,8 @@ CORS(app, resources={
 })
 
 # Ruta para modelos de aprendizaje
-# Usar el disco persistente en Render, o una carpeta local para pruebas
-MODELS_DIR = "/app/models" if os.getenv("RENDER") else "models/"
+# Usar una ruta relativa al directorio de trabajo actual
+MODELS_DIR = os.path.join(os.getcwd(), "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
 
 @app.route('/api/zonas_riesgo', methods=['GET'])
@@ -290,7 +290,7 @@ def entrenar_modelo(delegacion_id):
         with open(model_path, 'wb') as file:
             pickle.dump(model_data, file)
         
-        print(f"✅ Modelo entrenado y guardado para delegación {delegacion_id}")
+        print(f"     Modelo entrenado y guardado para delegación {delegacion_id}")
         
         # Guardar también un modelo para tipos de incidentes
         tipos_query = """
