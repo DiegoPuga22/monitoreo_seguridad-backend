@@ -1,4 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
+// Definir la URL base del backend
+const API_URL = "https://backend-monitoreo-seguridad.onrender.com";
+//const API_URL = "https://backend-monitoreo-seguridad.onrender.com";
+
+// Nota: En un entorno de producción, podrías usar una variable de entorno como:
+// const API_URL = process.env.REACT_APP_API_URL || "https://backend-monitoreo-seguridad.onrender.com";
+// Luego, configura REACT_APP_API_URL en Vercel con el valor "https://backend-monitoreo-seguridad.onrender.com"
 
 function Delegations() {
   const [selectedDate, setSelectedDate] = useState(null);
@@ -16,7 +24,7 @@ function Delegations() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:5000/delegaciones")
+    fetch(`${API_URL}/delegaciones`)
       .then((response) => response.json())
       .then((data) => setDelegations(data))
       .catch((error) => console.error("Error fetching delegations:", error));
@@ -43,7 +51,7 @@ function Delegations() {
       setIsPrediction(isDateFuture || isMonthFuture);
 
       fetch(
-        `http://localhost:5000/incidentes?delegacion_id=${selectedDelegation.id}&fecha=${dateParam}&periodo=${periodParam}`
+        `${API_URL}/incidentes?delegacion_id=${selectedDelegation.id}&fecha=${dateParam}&periodo=${periodParam}`
       )
         .then((response) => response.json())
         .then((data) => {
@@ -158,7 +166,7 @@ function Delegations() {
       confirmado: confirmed
     };
 
-    fetch("http://localhost:5000/retroalimentacion", {
+    fetch(`${API_URL}/retroalimentacion`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+
+// Definir la URL base del backend
+const API_URL = "https://backend-monitoreo-seguridad.onrender.com";
+// Nota: En un entorno de producción, podrías usar una variable de entorno como:
+// const API_URL = process.env.REACT_APP_API_URL || "https://backend-monitoreo-seguridad.onrender.com";
+// Luego, configura REACT_APP_API_URL en Vercel con el valor "https://backend-monitoreo-seguridad.onrender.com"
 
 const GenderStatsCard = () => {
   const [menPercentage, setMenPercentage] = useState(0);
   const [womenPercentage, setWomenPercentage] = useState(0);
 
   useEffect(() => {
-    fetch("/gender-stats")
+    fetch(`${API_URL}/gender-stats`)
       .then(response => response.json())
       .then(data => {
         setMenPercentage(data.menPercentage);
