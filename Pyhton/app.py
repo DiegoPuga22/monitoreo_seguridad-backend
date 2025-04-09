@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
-import mysql.connector
+import sys
+import traceback
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import random
@@ -8,31 +9,59 @@ import os
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
+from conexion import get_db_connection  # Importar desde conexion.py
+import logging
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+logger.info("Iniciando el servidor Flask...")
 
 app = Flask(__name__)
 CORS(app)
-
-# Configuración de la base de datos
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "Fernanda0202",  
-    "database": "monitoreo_seguridad"
-}
 
 # Ruta para modelos de aprendizaje
 MODELS_DIR = "models/"
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-# Función para conectar con la base de datos
-def get_db_connection():
+# Manejador global de excepciones
+@app.errorhandler(Exception)
+def handle_exception(e):
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    traceback_details = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    error_message = "".join(traceback_details)
+    logger.error(f"Error global: {error_message}")
+    return jsonify({"error": str(e), "traceback": error_message}), 500
+
+@app.route("/")
+def home():
+    logger.info("Accediendo a la ruta /")
+    return "🔥 El servidor Flask está corriendo correctamente"
+
+@app.route("/delegaciones", methods=["GET"])
+def obtener_lista_delegaciones():
+    logger.info("Accediendo a /delegaciones")
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        return conn
-    except mysql.connector.Error as err:
-        print(f"❌ Error de conexión a la base de datos: {err}")
-        return None
-    
+        conn = get_db_connection()
+        if not conn:
+            logger.error("No se pudo conectar a la base de datos")
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        logger.debug("Ejecutando consulta SELECT * FROM v_lista_delegaciones")
+        cursor.execute("SELECT * FROM v_lista_delegaciones")
+        delegaciones = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        logger.info("Delegaciones obtenidas correctamente")
+        return jsonify(delegaciones)
+    except Exception as e:
+        logger.error(f"Error en obtener_lista_delegaciones: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/zonas_riesgo', methods=['GET'])
 def get_zonas_riesgo():
@@ -40,9 +69,9 @@ def get_zonas_riesgo():
     cursor = conn.cursor(dictionary=True)  # Return results as dictionaries
     
     # Consulta para calcular los porcentajes de riesgo
-    cursor.execute(''' 
-        SELECT 
-            d.id, 
+    cursor.execute('''
+        SELECT
+            d.id,
             d.nombre,
             ROUND((SUM(CASE WHEN nr.codigo_color = 'danger' THEN 1 ELSE 0 END) / COUNT(i.id)) * 100) AS red,
             ROUND((SUM(CASE WHEN nr.codigo_color = 'warning' THEN 1 ELSE 0 END) / COUNT(i.id)) * 100) AS yellow,
@@ -81,23 +110,6 @@ def get_estimaciones_riesgo():
     conn.close()
     
     return jsonify(estimaciones_riesgo)
-
-
-
-# Obtener lista de delegaciones
-@app.route("/delegaciones", methods=["GET"])
-def obtener_lista_delegaciones():
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
-
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM v_lista_delegaciones")
-    delegaciones = cursor.fetchall()
-    
-    cursor.close()
-    conn.close()
-    return jsonify(delegaciones)
 
 # Obtener incidentes por delegación y fecha (históricos o predicciones)
 @app.route("/incidentes", methods=["GET"])
@@ -719,10 +731,6 @@ def obtener_estadisticas_historicas():
     conn.close()
     return jsonify(data)
 
-# Ruta de prueba para ver si la API corre
-@app.route("/")
-def home():
-    return "🔥 El servidor Flask está corriendo correctamente con predicciones de incidentes futuros y aprendizaje automático."
-
 if __name__ == "__main__":
+    logger.info("Lanzando el servidor en puerto 5000...")
     app.run(debug=True, port=5000)

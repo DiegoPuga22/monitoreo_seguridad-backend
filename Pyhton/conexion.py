@@ -1,21 +1,21 @@
 import mysql.connector
 import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # Usará la configuración de app.py
+
+
 
 def get_db_connection():
     try:
         conexion = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="Fernanda0202",
-            database="monitoreo_seguridad"
+            host="jamadev.com",
+            user="admin",
+            password="5d9n7zJ@6",
+            database="admin_plantify",
+            charset="utf8",  # Usa utf8 en lugar de utf8mb4
+            collation="utf8mb4_general_ci"
         )
+        logger.info("Conexión a la base de datos exitosa")
         return conexion
     except mysql.connector.Error as e:
         logger.error(f"Error al conectar a MySQL: {e}")
